@@ -258,7 +258,6 @@ class AtomicSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setPlaceholder('sk-...')
                 .setValue(this.plugin.settings.apiKey)
-                .then(text => text.inputEl.type = 'password')
                 .onChange(async (value) => {
                     this.plugin.settings.apiKey = value;
                     await this.plugin.saveSettings();
