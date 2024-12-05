@@ -1,134 +1,331 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import OpenAI from 'openai';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+// Types and Interfaces
+interface AtomicPluginSettings {
+    apiKey: string;
+    outputFolder: string;
+    model: string;
+    enableAtomizedTag: boolean;
+    customTags: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+// Constants
+const DEFAULT_SETTINGS: AtomicPluginSettings = {
+    apiKey: '',
+    outputFolder: 'atomic-notes',
+    model: 'gpt-4o-mini',
+    enableAtomizedTag: true,
+    customTags: ''
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+const getCurrentDateTime = (): string => {
+    const date = new Date();
+    return date.toISOString()
+        .replace('T', ' ')
+        .replace(/\.\d+Z$/, '');
+};
 
-	async onload() {
-		await this.loadSettings();
+// Move SYSTEM_PROMPT into a function that takes settings as a parameter
+const getSystemPrompt = (settings: AtomicPluginSettings): string => {
+    return `You are an expert at creating atomic notes from a single, larger note.
+            Take the content from a larger note and break it down into separate compact yet detailed atomic notes. Each note MUST be separated by placing '<<<>>>' on its own line between notes. Do not include an index or main note. Follow these rules:
+1. Each note should contain exactly one clear idea. This can contain multiple lines.
+2. Each note must have a YAML frontmatter section at the top with:
+---
+date: "${getCurrentDateTime()}"
+tags: ${settings.enableAtomizedTag ? 'atomized' : ''}${settings.customTags ? (settings.enableAtomizedTag ? ', ' : '') + settings.customTags : ''}
+---
+3. You MUST separate each note by placing '<<<>>>' on its own line between notes
+4. After the frontmatter, each note must start with a level 1 heading (# Title)
+5. The content should be self-contained and independently understandable
+6. Use proper Markdown formatting
+7. Do not include the separator at the start or end of the response`;
+};
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+// OpenAI Service
+class OpenAIService {
+    constructor(private apiKey: string, private model: string, private settings: AtomicPluginSettings) {}
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+    async generateAtomicNotes(content: string, dateTime: string): Promise<string> {
+        if (!this.apiKey) {
+            new Notice('OpenAI API key is not set. Please configure it in plugin settings.');
+            return '';
+        }
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+        // Inform user about network request
+        new Notice('Sending request to OpenAI...', 3000);
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
+        const openai = new OpenAI({
+            apiKey: this.apiKey,
+            dangerouslyAllowBrowser: true
+        });
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+        const completion = await openai.chat.completions.create({
+            model: this.model,
+            messages: [{
+                role: "system",
+                content: getSystemPrompt(this.settings)
+            }, {
+                role: "user",
+                content: content
+            }],
+            temperature: 0.7,
+            max_tokens: 4000
+        });
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
-
-	onunload() {
-
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+        return completion.choices[0]?.message?.content ?? '';
+    }
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+// Notes Manager
+class NotesManager {
+    private usedTitles = new Set<string>();
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+    constructor(private app: App, private folderPath: string) {}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+    async createFolder(): Promise<void> {
+        if (!(await this.app.vault.adapter.exists(this.folderPath))) {
+            await this.app.vault.createFolder(this.folderPath);
+        }
+    }
+
+    async saveNote(note: string): Promise<void> {
+        const titleMatch = note.match(/^#\s+(.+)$/m);
+        if (!titleMatch) {
+            console.warn('No title found in note:', note.slice(0, 100));
+            return;
+        }
+
+        const title = this.getUniqueTitle(titleMatch[1].trim());
+        const fileName = `${this.folderPath}/${this.sanitizeTitle(title)}.md`;
+        await this.app.vault.create(fileName, note.trim());
+    }
+
+    private getUniqueTitle(baseTitle: string): string {
+        let title = baseTitle;
+        let counter = 1;
+        while (this.usedTitles.has(title)) {
+            title = `${baseTitle} ${counter}`;
+            counter++;
+        }
+        this.usedTitles.add(title);
+        return title;
+    }
+
+    private sanitizeTitle(title: string): string {
+        return title.replace(/[\\/:*?"<>|]/g, '-');
+    }
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+// Main Plugin Class
+export default class AtomicNotesPlugin extends Plugin {
+    settings: AtomicPluginSettings;
+    private statusBarItem: HTMLElement;
 
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
+    async onload() {
+        await this.loadSettings();
 
-	display(): void {
-		const {containerEl} = this;
+        // Add ribbon icon
+        this.addRibbonIcon('atom', 'Atomize Note', async () => {
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if (activeView) {
+                await this.atomizeNote(activeView);
+            } else {
+                new Notice('Please open a note to atomize');
+            }
+        });
 
-		containerEl.empty();
+        // Add command
+        this.addCommand({
+            id: 'atomize-current-note',
+            name: 'Atomize current note',
+            editorCallback: async (editor: Editor, view: MarkdownView) => {
+                await this.atomizeNote(view);
+            }
+        });
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+        // Add settings tab
+        this.addSettingTab(new AtomicSettingTab(this.app, this));
+
+        this.statusBarItem = this.addStatusBarItem();
+        this.statusBarItem.setText('Atomic Notes: Ready');
+    }
+
+    async atomizeNote(view: MarkdownView) {
+        if (!this.validateSettings()) return;
+
+        const content = view.getViewData();
+        if (!content.trim()) {
+            new Notice('The current note is empty');
+            return;
+        }
+
+        new ConfirmationModal(this.app, async () => {
+            const loadingNotice = new Notice('Processing note...', 0);
+
+            try {
+                const openAIService = new OpenAIService(
+                    this.settings.apiKey, 
+                    this.settings.model,
+                    this.settings
+                );
+                const notesManager = new NotesManager(this.app, this.settings.outputFolder);
+
+                const responseContent = await openAIService.generateAtomicNotes(content, this.getCurrentDateTime());
+                if (!responseContent) throw new Error('No content received from OpenAI');
+
+                const atomicNotes = responseContent
+                    .split('<<<>>>')
+                    .map(note => note.trim())
+                    .filter(note => note.length > 0);
+
+                if (atomicNotes.length === 0) {
+                    throw new Error('No atomic notes were generated. The response may not be properly formatted.');
+                }
+
+                await notesManager.createFolder();
+
+                for (const note of atomicNotes) {
+                    await notesManager.saveNote(note);
+                }
+
+                new Notice(`Successfully created ${atomicNotes.length} atomic notes`);
+            } catch (error) {
+                this.handleError(error);
+            } finally {
+                loadingNotice.hide();
+                this.statusBarItem.setText('Atomic Notes: Ready');
+            }
+        }).open();
+    }
+
+    private validateSettings(): boolean {
+        if (!this.settings.apiKey) {
+            new Notice('Please set your OpenAI API key in settings');
+            return false;
+        }
+        return true;
+    }
+
+    private handleError(error: any) {
+        console.error('Detailed error:', error);
+        new Notice(`Error: ${error.message || 'Unknown error occurred'}`);
+        
+        if (error.response) {
+            console.error('OpenAI API Error:', {
+                status: error.response.status,
+                data: error.response.data
+            });
+        }
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    private getCurrentDateTime(): string {
+        return new Date().toISOString();
+    }
+}
+
+class AtomicSettingTab extends PluginSettingTab {
+    plugin: AtomicNotesPlugin;
+
+    constructor(app: App, plugin: AtomicNotesPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const {containerEl} = this;
+        containerEl.empty();
+
+        new Setting(containerEl)
+            .setName('OpenAI API Key')
+            .setDesc('Enter your OpenAI API key')
+            .addText(text => text
+                .setPlaceholder('sk-...')
+                .setValue(this.plugin.settings.apiKey)
+                .onChange(async (value) => {
+                    this.plugin.settings.apiKey = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Model')
+            .setDesc('Choose the OpenAI model to use')
+            .addDropdown(dropdown => dropdown
+                .addOption('gpt-4o-mini', 'GPT-4o Mini')
+                .addOption('gpt-4o', 'GPT-4o')
+                .setValue(this.plugin.settings.model)
+                .onChange(async (value) => {
+                    this.plugin.settings.model = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Output Folder')
+            .setDesc('Folder where atomic notes will be created')
+            .addText(text => text
+                .setPlaceholder('atomic-notes')
+                .setValue(this.plugin.settings.outputFolder)
+                .onChange(async (value) => {
+                    this.plugin.settings.outputFolder = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Enable "atomized" Tag')
+            .setDesc('Automatically add the "atomized" tag to generated notes')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableAtomizedTag)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableAtomizedTag = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Custom Tags')
+            .setDesc('Additional tags to add to generated notes (comma-separated)')
+            .addText(text => text
+                .setPlaceholder('tag1, tag2, tag3')
+                .setValue(this.plugin.settings.customTags)
+                .onChange(async (value) => {
+                    this.plugin.settings.customTags = value;
+                    await this.plugin.saveSettings();
+                }));
+    }
+}
+
+class ConfirmationModal extends Modal {
+    constructor(app: App, private onConfirm: () => void) {
+        super(app);
+    }
+
+    onOpen() {
+        const {contentEl} = this;
+        contentEl.setText('This will create multiple atomic notes in your vault. Continue?');
+        
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('Cancel')
+                .onClick(() => this.close()))
+            .addButton(btn => btn
+                .setButtonText('Continue')
+                .setCta()
+                .onClick(() => {
+                    this.close();
+                    this.onConfirm();
+                }));
+    }
+
+    onClose() {
+        const {contentEl} = this;
+        contentEl.empty();
+    }
 }
