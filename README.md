@@ -1,4 +1,4 @@
-# Atomic Notes Generator for Obsidian
+# Atomizer: Atomic Notes Generator for Obsidian
 
 This plugin helps break down large notes into smaller, atomic notes using OpenAI's API.
 
