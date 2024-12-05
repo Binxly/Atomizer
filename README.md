@@ -16,3 +16,9 @@ This plugin makes network requests to:
 - Send selected note to OpenAI for processing, where it will be broken down into atomic notes that aim to extract key insights from the original note.
 - Frontmatter will be added to each new note, including the date and any custom tags you've configured.
 - Models supported: `gpt-4o-mini`, `gpt-4o`; Can be configured in settings.
+
+# Manual Installation
+- Clone this repo.
+- Make sure your NodeJS is at least v16 (node --version).
+- npm i or yarn to install dependencies.
+- npm run dev to start compilation in watch mode.
