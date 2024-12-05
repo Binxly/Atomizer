@@ -2,6 +2,13 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 import OpenAI from 'openai';
 
 // Types and Interfaces
+interface APIError extends Error {
+    response?: {
+        status: number;
+        data: any;
+    };
+}
+
 interface AtomicPluginSettings {
     apiKey: string;
     outputFolder: string;
@@ -47,7 +54,7 @@ tags: ${settings.enableAtomizedTag ? 'atomized' : ''}${settings.customTags ? (se
 class OpenAIService {
     constructor(private apiKey: string, private model: string, private settings: AtomicPluginSettings) {}
 
-    async generateAtomicNotes(content: string, dateTime: string): Promise<string> {
+    async generateAtomicNotes(content: string, timestamp: string): Promise<string> {
         if (!this.apiKey) {
             new Notice('OpenAI API key is not set. Please configure it in plugin settings.');
             return '';
@@ -208,7 +215,7 @@ export default class AtomicNotesPlugin extends Plugin {
         return true;
     }
 
-    private handleError(error: any) {
+    private handleError(error: APIError) {
         console.error('Detailed error:', error);
         new Notice(`Error: ${error.message || 'Unknown error occurred'}`);
         
