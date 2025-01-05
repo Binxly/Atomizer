@@ -105,7 +105,7 @@ class NotesManager {
         }
 
         const title = this.getUniqueTitle(titleMatch[1].trim());
-        const fileName = `${this.folderPath}/${this.sanitizeTitle(title)}.md`;
+        const fileName = `${this.folderPath}/${normalizePath(title)}.md`;
         await this.app.vault.create(fileName, note.trim());
     }
 
@@ -116,10 +116,6 @@ class NotesManager {
             title = `${baseTitle} ${counter}`;
             counter++;
         }
-        return this.sanitizeTitle(title);
-    }
-
-    private sanitizeTitle(title: string): string {
         return normalizePath(title);
     }
 }
