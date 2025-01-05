@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import OpenAI from 'openai';
 
 // Types and Interfaces
@@ -116,12 +116,11 @@ class NotesManager {
             title = `${baseTitle} ${counter}`;
             counter++;
         }
-        this.usedTitles.add(title);
-        return title;
+        return this.sanitizeTitle(title);
     }
 
     private sanitizeTitle(title: string): string {
-        return title.replace(/[\\/:*?"<>|]/g, '-');
+        return normalizePath(title);
     }
 }
 
@@ -134,7 +133,7 @@ export default class AtomicNotesPlugin extends Plugin {
         await this.loadSettings();
 
         // Add ribbon icon
-        this.addRibbonIcon('atom', 'Atomize Note', async () => {
+        this.addRibbonIcon('atom', 'Atomize note', async () => {
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (activeView) {
                 await this.atomizeNote(activeView);
@@ -156,7 +155,7 @@ export default class AtomicNotesPlugin extends Plugin {
         this.addSettingTab(new AtomicSettingTab(this.app, this));
 
         this.statusBarItem = this.addStatusBarItem();
-        this.statusBarItem.setText('Atomic Notes: Ready');
+        this.statusBarItem.setText('Atomic notes: ready');
     }
 
     async atomizeNote(view: MarkdownView) {
@@ -253,7 +252,7 @@ class AtomicSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('OpenAI API Key')
+            .setName('OpenAI API key')
             .setDesc('Enter your OpenAI API key')
             .addText(text => text
                 .setPlaceholder('sk-...')
@@ -276,7 +275,7 @@ class AtomicSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Output Folder')
+            .setName('Output folder')
             .setDesc('Folder where atomic notes will be created')
             .addText(text => text
                 .setPlaceholder('atomic-notes')
@@ -287,7 +286,7 @@ class AtomicSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Enable "atomized" Tag')
+            .setName('Enable "atomized" tag')
             .setDesc('Automatically add the "atomized" tag to generated notes')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableAtomizedTag)
@@ -297,7 +296,7 @@ class AtomicSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Custom Tags')
+            .setName('Custom tags')
             .setDesc('Additional tags to add to generated notes (comma-separated)')
             .addText(text => text
                 .setPlaceholder('tag1, tag2, tag3')
