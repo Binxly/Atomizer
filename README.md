@@ -1,5 +1,7 @@
 # Atomizer: Turn notes into ideas
 
+**NOTE: THIS PLUGIN IS CURRENTLY IN ITS EARLY STAGES OF DEVELOPMENT. UPDATES WILL BE SPARSE UNTIL I HAVE MORE TIME TO DEDICATE TO ADDING FEATURES! THANK YOU FOR THE FEEDBACK SO FAR! :)**
+
 This plugin helps break down large notes into smaller, "atomic" style notes and ideas, using the OpenAI API.
 
 ## Requirements
