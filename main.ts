@@ -38,7 +38,11 @@ const DEFAULT_SETTINGS: AtomizerSettings = {
 	customTags: "",
 };
 
-const getCurrentDateTime = (): string => {
+/**
+ * Formats the current date and time in a user-friendly format
+ * For frontmatter, we use a human-readable format with spaces
+ */
+const getFormattedDateTime = (): string => {
 	const date = new Date();
 	return date
 		.toISOString()
@@ -53,7 +57,7 @@ const getSystemPrompt = (settings: AtomizerSettings): string => {
 1. Each note should contain exactly one clear idea. This can contain multiple lines.
 2. Each note must have a YAML frontmatter section at the top with:
 ---
-date: "${getCurrentDateTime()}"
+date: "${getFormattedDateTime()}"
 tags: ${settings.enableAtomizedTag ? "atomized" : ""}${settings.customTags ? (settings.enableAtomizedTag ? ", " : "") + settings.customTags : ""}
 ---
 3. You MUST separate each note by placing '<<<>>>' on its own line between notes
@@ -216,7 +220,7 @@ export default class AtomizerPlugin extends Plugin {
 
 				const responseContent = await openAIService.generateAtomicNotes(
 					content,
-					this.getCurrentDateTime(),
+					this.getISOTimestamp(),
 				);
 				if (!responseContent)
 					throw new Error("No content received from OpenAI");
@@ -288,7 +292,10 @@ export default class AtomizerPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	private getCurrentDateTime(): string {
+	/**
+	 * Returns an ISO-formatted timestamp for OpenAI API
+	 */
+	private getISOTimestamp(): string {
 		return new Date().toISOString();
 	}
 }
