@@ -1,5 +1,4 @@
 import {
-	App,
 	Editor,
 	MarkdownView,
 	MarkdownFileInfo,
@@ -9,8 +8,8 @@ import {
 
 import {
 	AtomizerSettings,
-	DEFAULT_SETTINGS,
 	AtomizerSettingTab,
+	DEFAULT_SETTINGS,
 } from "./settings";
 
 import { OpenAIService } from "./openai-service";
@@ -89,9 +88,13 @@ export default class AtomizerPlugin extends Plugin {
 					this.settings.outputFolder,
 				);
 
+				// Get the source file name to include in the generated notes
+				const sourceFileName = view.file?.basename || "Unknown Source";
+
 				const responseContent = await openAIService.generateAtomicNotes(
 					content,
 					getISOTimestamp(),
+					sourceFileName,
 				);
 				if (!responseContent)
 					throw new Error("No content received from OpenAI");
