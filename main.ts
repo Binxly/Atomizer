@@ -21,7 +21,7 @@ interface APIError extends Error {
 	};
 }
 
-interface AtomicPluginSettings {
+interface AtomizerSettings {
 	apiKey: string;
 	outputFolder: string;
 	model: string;
@@ -30,7 +30,7 @@ interface AtomicPluginSettings {
 }
 
 // Constants
-const DEFAULT_SETTINGS: AtomicPluginSettings = {
+const DEFAULT_SETTINGS: AtomizerSettings = {
 	apiKey: "",
 	outputFolder: "atomic-notes",
 	model: "gpt-4o-mini",
@@ -47,7 +47,7 @@ const getCurrentDateTime = (): string => {
 };
 
 // Move SYSTEM_PROMPT into a function that takes settings as a parameter
-const getSystemPrompt = (settings: AtomicPluginSettings): string => {
+const getSystemPrompt = (settings: AtomizerSettings): string => {
 	return `You are an expert at creating atomic notes from a single, larger note.
             Take the content from a larger note and break it down into separate compact yet detailed atomic notes. Each note MUST be separated by placing '<<<>>>' on its own line between notes. Do not include an index or main note. Follow these rules:
 1. Each note should contain exactly one clear idea. This can contain multiple lines.
@@ -68,7 +68,7 @@ class OpenAIService {
 	constructor(
 		private apiKey: string,
 		private model: string,
-		private settings: AtomicPluginSettings,
+		private settings: AtomizerSettings,
 	) {}
 
 	async generateAtomicNotes(
@@ -150,8 +150,8 @@ class NotesManager {
 }
 
 // Main Plugin Class
-export default class AtomicNotesPlugin extends Plugin {
-	settings: AtomicPluginSettings = DEFAULT_SETTINGS;
+export default class AtomizerPlugin extends Plugin {
+	settings: AtomizerSettings = DEFAULT_SETTINGS;
 	private statusBarItem!: HTMLElement;
 
 	async onload() {
@@ -185,10 +185,10 @@ export default class AtomicNotesPlugin extends Plugin {
 		});
 
 		// Add settings tab
-		this.addSettingTab(new AtomicSettingTab(this.app, this));
+		this.addSettingTab(new AtomizerSettingTab(this.app, this));
 
 		this.statusBarItem = this.addStatusBarItem();
-		this.statusBarItem.setText("Atomic notes: ready");
+		this.statusBarItem.setText("Atomizer: ready");
 	}
 
 	async atomizeNote(view: MarkdownView) {
@@ -245,7 +245,7 @@ export default class AtomicNotesPlugin extends Plugin {
 				this.handleError(error);
 			} finally {
 				loadingNotice.hide();
-				this.statusBarItem.setText("Atomic Notes: Ready");
+				this.statusBarItem.setText("Atomizer: Ready");
 			}
 		}).open();
 	}
@@ -293,10 +293,10 @@ export default class AtomicNotesPlugin extends Plugin {
 	}
 }
 
-class AtomicSettingTab extends PluginSettingTab {
-	plugin: AtomicNotesPlugin;
+class AtomizerSettingTab extends PluginSettingTab {
+	plugin: AtomizerPlugin;
 
-	constructor(app: App, plugin: AtomicNotesPlugin) {
+	constructor(app: App, plugin: AtomizerPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
