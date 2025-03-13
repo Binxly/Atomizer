@@ -2,6 +2,7 @@ import {
 	App,
 	Editor,
 	MarkdownView,
+	MarkdownFileInfo,
 	Modal,
 	Notice,
 	Plugin,
@@ -9,6 +10,7 @@ import {
 	Setting,
 	normalizePath,
 } from "obsidian";
+
 import OpenAI from "openai";
 
 // Types and Interfaces
@@ -125,12 +127,13 @@ class NotesManager {
 
 	async saveNote(note: string): Promise<void> {
 		const titleMatch = note.match(/^#\s+(.+)$/m);
-		if (!titleMatch) {
+		if (!titleMatch || !titleMatch[1]) {
 			console.warn("No title found in note:", note.slice(0, 100));
 			return;
 		}
 
-		const title = this.getUniqueTitle(titleMatch[1].trim());
+		const baseTitle = titleMatch[1].trim();
+		const title = this.getUniqueTitle(baseTitle);
 		const fileName = `${this.folderPath}/${normalizePath(title)}.md`;
 		await this.app.vault.create(fileName, note.trim());
 	}
@@ -148,8 +151,8 @@ class NotesManager {
 
 // Main Plugin Class
 export default class AtomicNotesPlugin extends Plugin {
-	settings: AtomicPluginSettings;
-	private statusBarItem: HTMLElement;
+	settings: AtomicPluginSettings = DEFAULT_SETTINGS;
+	private statusBarItem!: HTMLElement;
 
 	async onload() {
 		await this.loadSettings();
@@ -169,8 +172,15 @@ export default class AtomicNotesPlugin extends Plugin {
 		this.addCommand({
 			id: "atomize-current-note",
 			name: "Atomize current note",
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-				await this.atomizeNote(view);
+			editorCallback: async (
+				editor: Editor,
+				ctx: MarkdownView | MarkdownFileInfo,
+			) => {
+				if (ctx instanceof MarkdownView) {
+					await this.atomizeNote(ctx);
+				} else {
+					new Notice("Please open a note to atomize");
+				}
 			},
 		});
 
@@ -248,15 +258,21 @@ export default class AtomicNotesPlugin extends Plugin {
 		return true;
 	}
 
-	private handleError(error: APIError) {
+	private handleError(error: unknown) {
 		console.error("Detailed error:", error);
-		new Notice(`Error: ${error.message || "Unknown error occurred"}`);
 
-		if (error.response) {
-			console.error("OpenAI API Error:", {
-				status: error.response.status,
-				data: error.response.data,
-			});
+		if (error instanceof Error) {
+			new Notice(`Error: ${error.message || "Unknown error occurred"}`);
+
+			const apiError = error as APIError;
+			if (apiError.response) {
+				console.error("OpenAI API Error:", {
+					status: apiError.response.status,
+					data: apiError.response.data,
+				});
+			}
+		} else {
+			new Notice("An unknown error occurred");
 		}
 	}
 
