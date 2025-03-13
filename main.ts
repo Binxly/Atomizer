@@ -195,6 +195,11 @@ export default class AtomizerPlugin extends Plugin {
 		this.statusBarItem.setText("Atomizer: ready");
 	}
 
+	onunload() {
+		// Clean up the status bar item
+		this.statusBarItem.remove();
+	}
+
 	async atomizeNote(view: MarkdownView) {
 		if (!this.validateSettings()) return;
 
