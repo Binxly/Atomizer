@@ -15,10 +15,14 @@ export class OpenAIService {
 
 	/**
 	 * Generate atomic notes from content using OpenAI
+	 * @param content The content to process
+	 * @param timestamp ISO timestamp
+	 * @param sourceFilePath Path to the source file
 	 */
 	async generateAtomicNotes(
 		content: string,
 		timestamp: string,
+		sourceFilePath: string,
 	): Promise<string> {
 		if (!this.apiKey) {
 			new Notice(
@@ -40,7 +44,7 @@ export class OpenAIService {
 			messages: [
 				{
 					role: "system",
-					content: this.getSystemPrompt(),
+					content: this.getSystemPrompt(sourceFilePath),
 				},
 				{
 					role: "user",
@@ -56,8 +60,9 @@ export class OpenAIService {
 
 	/**
 	 * Generate the system prompt for OpenAI
+	 * @param sourceFilePath Path to the source file for back-linking
 	 */
-	private getSystemPrompt(): string {
+	private getSystemPrompt(sourceFilePath: string): string {
 		return `You are an expert at creating atomic notes from a single, larger note.
                 Take the content from a larger note and break it down into separate compact yet detailed atomic notes. Each note MUST be separated by placing '<<<>>>' on its own line between notes. Do not include an index or main note. Follow these rules:
 1. Each note should contain exactly one clear idea. This can contain multiple lines.
@@ -65,6 +70,7 @@ export class OpenAIService {
 ---
 date: "${getFormattedDateTime()}"
 tags: ${this.settings.enableAtomizedTag ? "atomized" : ""}${this.settings.customTags ? (this.settings.enableAtomizedTag ? ", " : "") + this.settings.customTags : ""}
+source: "[[${sourceFilePath}]]"
 ---
 3. You MUST separate each note by placing '<<<>>>' on its own line between notes
 4. After the frontmatter, each note must start with a level 1 heading (# Title)
