@@ -46,6 +46,7 @@ export class NotesManager {
 			title = `${baseTitle} ${counter}`;
 			counter++;
 		}
+		this.usedTitles.add(title);
 		return normalizePath(title);
 	}
 }
