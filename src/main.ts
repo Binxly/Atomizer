@@ -116,9 +116,18 @@ export default class AtomizerPlugin extends Plugin {
 					await notesManager.saveNote(note);
 				}
 
-				new Notice(
-					`Successfully created ${atomicNotes.length} atomic notes`,
-				);
+				// Check if any notes were missing titles
+				const skippedNotes = notesManager.getSkippedNotes();
+				if (skippedNotes.length > 0) {
+					new Notice(
+						`Successfully created ${atomicNotes.length} atomic notes. Warning: ${skippedNotes.length} note(s) were missing titles and given fallback names.`,
+						8000,
+					);
+				} else {
+					new Notice(
+						`Successfully created ${atomicNotes.length} atomic notes`,
+					);
+				}
 			} catch (error) {
 				this.handleError(error);
 			} finally {

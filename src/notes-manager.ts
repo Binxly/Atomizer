@@ -5,6 +5,8 @@ import { App, normalizePath } from "obsidian";
  */
 export class NotesManager {
 	private usedTitles = new Set<string>();
+	private untitledCounter = 1;
+	private skippedNotes: string[] = [];
 
 	constructor(
 		private app: App,
@@ -25,15 +27,31 @@ export class NotesManager {
 	 */
 	async saveNote(note: string): Promise<void> {
 		const titleMatch = note.match(/^#\s+(.+)$/m);
+		let baseTitle: string;
+
 		if (!titleMatch || !titleMatch[1]) {
-			console.warn("No title found in note:", note.slice(0, 100));
-			return;
+			// Generate fallback title for notes without titles
+			baseTitle = `Untitled Note ${this.untitledCounter}`;
+			this.untitledCounter++;
+			console.warn("No title found in note, using fallback:", baseTitle);
+			this.skippedNotes.push(baseTitle);
+
+			// Prepend a title to the note content
+			note = `# ${baseTitle}\n\n${note}`;
+		} else {
+			baseTitle = titleMatch[1].trim();
 		}
 
-		const baseTitle = titleMatch[1].trim();
 		const title = this.getUniqueTitle(baseTitle);
 		const fileName = `${this.folderPath}/${normalizePath(title)}.md`;
 		await this.app.vault.create(fileName, note.trim());
+	}
+
+	/**
+	 * Get list of notes that were missing titles
+	 */
+	getSkippedNotes(): string[] {
+		return this.skippedNotes;
 	}
 
 	/**
@@ -46,6 +64,7 @@ export class NotesManager {
 			title = `${baseTitle} ${counter}`;
 			counter++;
 		}
+		this.usedTitles.add(title);
 		return normalizePath(title);
 	}
 }
