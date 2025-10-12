@@ -129,10 +129,38 @@ export default class AtomizerPlugin extends Plugin {
 	}
 
 	private validateSettings(): boolean {
-		if (!this.settings.apiKey) {
+		// Validate API key
+		if (!this.settings.apiKey || !this.settings.apiKey.trim()) {
 			new Notice("Please set your OpenAI API key in settings");
 			return false;
 		}
+
+		// Validate API key format (basic check for OpenAI key pattern)
+		if (!this.settings.apiKey.startsWith("sk-")) {
+			new Notice("Invalid OpenAI API key format. Keys should start with 'sk-'");
+			return false;
+		}
+
+		// Validate output folder
+		if (!this.settings.outputFolder || !this.settings.outputFolder.trim()) {
+			new Notice("Output folder path cannot be empty");
+			return false;
+		}
+
+		// Check for invalid characters in folder path
+		const invalidChars = /[<>:"|?*\x00-\x1f]/;
+		if (invalidChars.test(this.settings.outputFolder)) {
+			new Notice("Output folder path contains invalid characters");
+			return false;
+		}
+
+		// Validate model selection
+		const validModels = ["gpt-4o-mini", "gpt-4o"];
+		if (!validModels.includes(this.settings.model)) {
+			new Notice(`Invalid model selected: ${this.settings.model}. Please choose a valid model in settings.`);
+			return false;
+		}
+
 		return true;
 	}
 
