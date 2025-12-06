@@ -24,13 +24,6 @@ export class OpenAIService {
 		timestamp: string,
 		sourceFilePath: string,
 	): Promise<string> {
-		if (!this.apiKey) {
-			new Notice(
-				"OpenAI API key is not set. Please configure it in plugin settings.",
-			);
-			return "";
-		}
-
 		// Inform user about network request
 		new Notice("Sending request to OpenAI...", 3000);
 
@@ -39,23 +32,42 @@ export class OpenAIService {
 			dangerouslyAllowBrowser: true,
 		});
 
-		const completion = await openai.chat.completions.create({
-			model: this.model,
-			messages: [
-				{
-					role: "system",
-					content: this.getSystemPrompt(sourceFilePath),
-				},
-				{
-					role: "user",
-					content: content,
-				},
-			],
-			temperature: 0.7,
-			max_tokens: 4000,
-		});
+		try {
+			const completion = await openai.chat.completions.create({
+				model: this.model,
+				messages: [
+					{
+						role: "system",
+						content: this.getSystemPrompt(sourceFilePath),
+					},
+					{
+						role: "user",
+						content: content,
+					},
+				],
+				temperature: 0.7,
+				max_tokens: 4000,
+			});
 
-		return completion.choices[0]?.message?.content ?? "";
+			return completion.choices[0]?.message?.content ?? "";
+		} catch (error: any) {
+			// Handle specific OpenAI API errors
+			if (error?.status === 401) {
+				throw new Error("Invalid OpenAI API key. Please check your settings.");
+			} else if (error?.status === 429) {
+				throw new Error("OpenAI API rate limit exceeded. Please try again later.");
+			} else if (error?.status === 404) {
+				throw new Error(`Model '${this.model}' not found. Please check your model selection.`);
+			} else if (error?.status === 400) {
+				throw new Error("Invalid request to OpenAI. The content may be too long or contain invalid characters.");
+			} else if (error?.code === "ENOTFOUND" || error?.code === "ECONNREFUSED") {
+				throw new Error("Network error. Please check your internet connection.");
+			} else if (error?.message) {
+				throw new Error(`OpenAI API error: ${error.message}`);
+			} else {
+				throw new Error("Failed to generate atomic notes. Please try again.");
+			}
+		}
 	}
 
 	/**
