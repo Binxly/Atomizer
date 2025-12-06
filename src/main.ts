@@ -75,6 +75,7 @@ export default class AtomizerPlugin extends Plugin {
 		}
 
 		new ConfirmationModal(this.app, async () => {
+			this.statusBarItem.setText("Atomizer: Processing...");
 			const loadingNotice = new Notice("Processing note...", 0);
 
 			try {
@@ -119,11 +120,12 @@ export default class AtomizerPlugin extends Plugin {
 				new Notice(
 					`Successfully created ${atomicNotes.length} atomic notes`,
 				);
+				this.statusBarItem.setText("Atomizer: Ready");
 			} catch (error) {
 				this.handleError(error);
+				this.statusBarItem.setText("Atomizer: Error");
 			} finally {
 				loadingNotice.hide();
-				this.statusBarItem.setText("Atomizer: Ready");
 			}
 		}).open();
 	}
