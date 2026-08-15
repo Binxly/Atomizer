@@ -85,7 +85,7 @@ tags: ${this.settings.enableAtomizedTag ? "atomized" : ""}${this.settings.custom
 source: "[[${sourceFilePath}]]"
 ---
 3. You MUST separate each note by placing '<<<>>>' on its own line between notes
-4. After the frontmatter, each note must start with a level 1 heading (# Title)
+4. After the frontmatter, each note must start with a level 1 heading (# Title). The title must be specific and descriptive, clearly identifying the unique subject or concept of the note. Avoid generic or ambiguous titles (e.g., "Historical Context", "Introduction", "Key Points") that could apply to any topic. Instead, include specific terms, names, or concepts from the content so that the title alone distinguishes this note from notes on other subjects.
 5. The content should be self-contained and independently understandable
 6. Use proper Markdown formatting
 7. Do not include the separator at the start or end of the response`;
